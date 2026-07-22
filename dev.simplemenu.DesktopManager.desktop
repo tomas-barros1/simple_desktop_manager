@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Desktop Manager
+Name[pt_BR]=Gerenciador de Desktop
+GenericName=Desktop Entry Editor
+GenericName[pt_BR]=Editor de Atalhos
+Comment=Browse, create, and edit Linux Desktop Entries (.desktop files)
+Comment[pt_BR]=Navegue, crie e edite atalhos de aplicativos (.desktop) no Linux
+Exec=simple_menu_manager
+Icon=preferences-other
+Terminal=false
+Categories=GTK;Utility;System;Settings;
+StartupNotify=true
