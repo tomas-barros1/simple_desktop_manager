@@ -129,6 +129,7 @@ impl Window {
         let stack_clone2 = content_stack.clone();
         let store_clone = store_entries.clone();
         let selected_clone = selected_entry.clone();
+        let win_editor = win.clone();
 
         sidebar.borrow().selection.connect_selected_notify(move |sel| {
             let Some(item) = sel.selected_item() else { return };
@@ -140,7 +141,7 @@ impl Window {
                 .unwrap_or(0);
             if let Some(entry) = store_clone.borrow().get(idx).cloned() {
                 *selected_clone.borrow_mut() = Some(entry.clone());
-                let editor = Editor::new(entry);
+                let editor = Editor::new(&win_editor, entry);
                 if let Some(existing) = stack_clone2.child_by_name("editor") {
                     stack_clone2.remove(&existing);
                 }
@@ -152,10 +153,11 @@ impl Window {
         // Add button action ('+' in sidebar bottom bar)
         let stack_clone_new = content_stack.clone();
         let selected_new = selected_entry.clone();
+        let win_new = win.clone();
         sidebar.borrow().add_btn.connect_clicked(move |_| {
             let new_entry = DesktopEntry::default();
             *selected_new.borrow_mut() = Some(new_entry.clone());
-            let editor = Editor::new(new_entry);
+            let editor = Editor::new(&win_new, new_entry);
             if let Some(existing) = stack_clone_new.child_by_name("editor") {
                 stack_clone_new.remove(&existing);
             }
