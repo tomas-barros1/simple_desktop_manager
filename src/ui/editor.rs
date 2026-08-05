@@ -240,13 +240,22 @@ impl Editor {
                     .spawn();
                 status_run.set_text(&t("status_opening_url"));
             } else if !exec_cmd.is_empty() {
-                let cmd_clean = exec_cmd
+                let tokens: Vec<&str> = exec_cmd
                     .split_whitespace()
                     .filter(|s| !s.starts_with('%'))
-                    .collect::<Vec<_>>()
-                    .join(" ");
+                    .collect();
+                let needs_auth = tokens.first() == Some(&"sudo");
+                let cmd_clean = if needs_auth {
+                    tokens[1..].join(" ")
+                } else {
+                    tokens.join(" ")
+                };
                 let mut command = std::process::Command::new("sh");
-                command.arg("-c").arg(&cmd_clean);
+                if needs_auth {
+                    command.arg("-c").arg(format!("pkexec {cmd_clean}"));
+                } else {
+                    command.arg("-c").arg(&cmd_clean);
+                }
                 if !path_dir.is_empty() {
                     command.current_dir(path_dir);
                 }

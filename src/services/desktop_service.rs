@@ -1,4 +1,4 @@
-use crate::models::{parse_desktop_file, write_desktop_file, DesktopEntry};
+use crate::models::{parse_desktop_file, serialize_desktop_entry, write_desktop_file, DesktopEntry};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tracing::{debug, error, info, warn};
@@ -86,24 +86,71 @@ pub fn load_one(path: &Path) -> Result<DesktopEntry, std::io::Error> {
 
 /// Save `entry` to disk. If it already has a `source_file`, overwrite that;
 /// otherwise place it in `~/.local/share/applications/<suggested>.desktop`.
+/// When the target is not writable (e.g. system directories), re-runs the
+/// write through `pkexec`, which prompts the user for their password.
 pub fn save_entry(entry: &DesktopEntry) -> Result<PathBuf, std::io::Error> {
     let target = if let Some(existing) = &entry.source_file {
         existing.clone()
     } else {
         user_applications_dir().join(entry.suggested_filename())
     };
-    write_desktop_file(entry, &target)?;
+    match write_desktop_file(entry, &target) {
+        Ok(_) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::PermissionDenied => {
+            save_with_pkexec(entry, &target)?;
+        }
+        Err(err) => return Err(err),
+    }
     info!(path = %target.display(), "saved entry");
     Ok(target)
 }
 
-/// Delete the underlying .desktop file for an entry. Access-control note: in
-/// user-local dir writes are fine; system files are only removed when the
-/// process has permission.
+fn save_with_pkexec(entry: &DesktopEntry, target: &Path) -> Result<(), std::io::Error> {
+    let content = serialize_desktop_entry(entry);
+    let tmp = std::env::temp_dir().join(format!("smm-{}.desktop", std::process::id()));
+    fs::write(&tmp, content)?;
+    let status = std::process::Command::new("pkexec")
+        .arg("cp")
+        .arg(&tmp)
+        .arg(target)
+        .status();
+    let _ = fs::remove_file(&tmp);
+    match status {
+        Ok(s) if s.success() => Ok(()),
+        Ok(s) => Err(std::io::Error::other(format!(
+            "pkexec exited with status {s}"
+        ))),
+        Err(err) => Err(err),
+    }
+}
+
+/// Delete the underlying .desktop file for an entry. User-local files are
+/// removed directly; system files that need elevation re-run the removal
+/// through `pkexec`, which prompts the user for their password.
 pub fn delete_entry(entry: &DesktopEntry) -> Result<(), std::io::Error> {
     if let Some(path) = &entry.source_file {
-        fs::remove_file(path)?;
-        info!(path = %path.display(), "deleted entry");
+        match fs::remove_file(path) {
+            Ok(_) => info!(path = %path.display(), "deleted entry"),
+            Err(err) if err.kind() == std::io::ErrorKind::PermissionDenied => {
+                let status = std::process::Command::new("pkexec")
+                    .arg("rm")
+                    .arg("-f")
+                    .arg(path)
+                    .status();
+                match status {
+                    Ok(s) if s.success() => {
+                        info!(path = %path.display(), "deleted entry via pkexec");
+                    }
+                    Ok(s) => {
+                        return Err(std::io::Error::other(format!(
+                            "pkexec exited with status {s}"
+                        )));
+                    }
+                    Err(err) => return Err(err),
+                }
+            }
+            Err(err) => return Err(err),
+        }
     }
     Ok(())
 }
