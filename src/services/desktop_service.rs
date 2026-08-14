@@ -30,18 +30,9 @@ pub fn load_all() -> Vec<DesktopEntry> {
         if !dir.is_dir() {
             continue;
         }
-        let entries = match fs::read_dir(dir) {
-            Ok(e) => e,
-            Err(err) => {
-                warn!(dir = %dir.display(), error = %err, "failed to read applications dir");
-                continue;
-            }
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) != Some("desktop") {
-                continue;
-            }
+        let mut files = Vec::new();
+        collect_desktop_files(dir, &mut files);
+        for path in files {
             let name_key = match path.file_name().and_then(|s| s.to_str()) {
                 Some(n) => n.to_string(),
                 None => continue,
@@ -153,6 +144,23 @@ pub fn delete_entry(entry: &DesktopEntry) -> Result<(), std::io::Error> {
         }
     }
     Ok(())
+}
+
+/// Recursively collect every `.desktop` file under `dir`, including
+/// subdirectories (e.g. Wine's `~/.local/share/applications/wine/Programs/...`).
+fn collect_desktop_files(dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        warn!(dir = %dir.display(), "failed to read applications dir");
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_desktop_files(&path, out);
+        } else if path.extension().and_then(|s| s.to_str()) == Some("desktop") {
+            out.push(path);
+        }
+    }
 }
 
 /// Default destination for brand-new entries. Honors `XDG_DATA_HOME`.
