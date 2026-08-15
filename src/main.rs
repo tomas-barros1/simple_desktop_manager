@@ -3,6 +3,9 @@ mod models;
 mod services;
 mod ui;
 
+#[cfg(test)]
+mod tests;
+
 use app::application::application_new;
 use gtk4::gio::prelude::*;
 use services::i18n::I18n;

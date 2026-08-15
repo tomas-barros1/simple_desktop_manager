@@ -6,16 +6,24 @@ use tracing::{debug, error, info, warn};
 /// Standard XDG search paths for .desktop files. Higher priority first — the
 /// user-local dir wins over the system ones on conflicts during editing.
 pub fn search_paths() -> Vec<PathBuf> {
-    vec![
+    let mut raw: Vec<PathBuf> = vec![
         PathBuf::from("/usr/share/applications"),
         PathBuf::from("/usr/local/share/applications"),
-    ]
-    .into_iter()
-    .chain(std::env::var("XDG_DATA_HOME").ok().map(|d| PathBuf::from(d).join("applications")))
-    .chain(
-        std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".local/share/applications")),
-    )
-    .collect()
+    ];
+    if let Ok(d) = std::env::var("XDG_DATA_HOME") {
+        raw.push(PathBuf::from(d).join("applications"));
+    }
+    if let Ok(h) = std::env::var("HOME") {
+        raw.push(PathBuf::from(h).join(".local/share/applications"));
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut paths = Vec::new();
+    for p in raw {
+        if seen.insert(p.clone()) {
+            paths.push(p);
+        }
+    }
+    paths
 }
 
 /// Read all .desktop files from the standard XDG paths. Entries parsed from
@@ -83,7 +91,9 @@ pub fn save_entry(entry: &DesktopEntry) -> Result<PathBuf, std::io::Error> {
     let target = if let Some(existing) = &entry.source_file {
         existing.clone()
     } else {
-        user_applications_dir().join(entry.suggested_filename())
+        let user_dir = user_applications_dir();
+        fs::create_dir_all(&user_dir)?;
+        user_dir.join(entry.suggested_filename())
     };
     match write_desktop_file(entry, &target) {
         Ok(_) => {}
@@ -120,6 +130,9 @@ fn save_with_pkexec(entry: &DesktopEntry, target: &Path) -> Result<(), std::io::
 /// through `pkexec`, which prompts the user for their password.
 pub fn delete_entry(entry: &DesktopEntry) -> Result<(), std::io::Error> {
     if let Some(path) = &entry.source_file {
+        if !path.exists() {
+            return Ok(());
+        }
         match fs::remove_file(path) {
             Ok(_) => info!(path = %path.display(), "deleted entry"),
             Err(err) if err.kind() == std::io::ErrorKind::PermissionDenied => {
@@ -148,7 +161,7 @@ pub fn delete_entry(entry: &DesktopEntry) -> Result<(), std::io::Error> {
 
 /// Recursively collect every `.desktop` file under `dir`, including
 /// subdirectories (e.g. Wine's `~/.local/share/applications/wine/Programs/...`).
-fn collect_desktop_files(dir: &Path, out: &mut Vec<PathBuf>) {
+pub(crate) fn collect_desktop_files(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
         warn!(dir = %dir.display(), "failed to read applications dir");
         return;

@@ -17,10 +17,11 @@ simple_menu_manager/
 │   └── pt_BR.json              # Brazilian Portuguese locale dictionary
 ├── src/
 │   ├── main.rs                 # Application entry point & logging setup
+│   ├── tests.rs                # Comprehensive test suite
 │   ├── app/
 │   │   ├── mod.rs              # App module exports
-│   │   ├── application.rs      # adw::Application / gtk4::Application setup
-│   │   └── window.rs           # Main ApplicationWindow layout & CSS provider
+│   │   ├── application.rs      # adw::Application setup
+│   │   └── window.rs           # Main ApplicationWindow & clean event coordinator
 │   ├── models/
 │   │   ├── mod.rs              # Models re-exports
 │   │   └── desktop_entry.rs    # DesktopEntry struct, .desktop parser & serializer
@@ -29,12 +30,22 @@ simple_menu_manager/
 │   │   ├── desktop_service.rs  # XDG path scanner, load/save/delete file operations
 │   │   ├── icon_cache.rs       # GTK IconTheme lookup & image rendering cache
 │   │   ├── i18n.rs             # Internationalization manager & system locale auto-detection
+│   │   ├── launcher_service.rs # Process & URL execution with token cleanup & pkexec
+│   │   ├── monitor_service.rs  # Real-time GIO filesystem watcher with debouncing
 │   │   └── search_service.rs   # Case-insensitive entry search & filtering
 │   └── ui/
 │       ├── mod.rs              # UI components module exports
-│       ├── components.rs       # Reusable GTK widgets
-│       ├── editor.rs           # Form panel divided into styled sections (Execução, Aparência, Opções Avançadas)
-│       └── sidebar.rs          # Searchable list sidebar with two-line item rendering and bottom action bar
+│       ├── components.rs       # Centralized reusable GTK widgets & file pickers
+│       ├── editor/             # Modular form panel
+│       │   ├── mod.rs          # Editor widget assembly & state coordination
+│       │   ├── footer.rs       # Action buttons (Run, Delete, Cancel, Save)
+│       │   ├── section_general.rs      # Name, Generic Name, Comment, Type
+│       │   ├── section_exec.rs         # Exec, Path, Terminal, URL
+│       │   ├── section_appearance.rs   # Icon, Categories, Keywords, Mime Types
+│       │   └── section_advanced.rs     # Startup Notify, WM Class, Hidden
+│       └── sidebar/            # Modular list sidebar
+│           ├── mod.rs          # Searchable list sidebar & bottom action bar
+│           └── row_factory.rs  # Factory item renderer (Icon + Name + Subtitle)
 └── AGENTS.md                   # Guidance document for AI agents and maintainers
 ```
 

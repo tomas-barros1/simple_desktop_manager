@@ -14,6 +14,7 @@ pub fn matches(entry: &DesktopEntry, query: &str) -> bool {
         &entry.comment,
         &entry.exec,
         &entry.categories.join(" "),
+        &entry.keywords.join(" "),
     ];
     fields
         .iter()
