@@ -24,11 +24,11 @@ clean:
 	cargo clean
 
 install: release
-	install -d $(DESTDIR)$(BINDIR)
-	install -m 755 target/release/$(NAME) $(DESTDIR)$(BINDIR)/$(NAME)
-	install -d $(DESTDIR)$(APPDIR)
-	install -m 644 $(DESKTOP_FILE) $(DESTDIR)$(APPDIR)/$(DESKTOP_FILE)
+	sudo install -d $(DESTDIR)$(BINDIR)
+	sudo install -m 755 target/release/$(NAME) $(DESTDIR)$(BINDIR)/$(NAME)
+	sudo install -d $(DESTDIR)$(APPDIR)
+	sudo install -m 644 $(DESKTOP_FILE) $(DESTDIR)$(APPDIR)/$(DESKTOP_FILE)
 
 uninstall:
-	rm -f $(DESTDIR)$(BINDIR)/$(NAME)
-	rm -f $(DESTDIR)$(APPDIR)/$(DESKTOP_FILE)
+	sudo rm -f $(DESTDIR)$(BINDIR)/$(NAME)
+	sudo rm -f $(DESTDIR)$(APPDIR)/$(DESKTOP_FILE)

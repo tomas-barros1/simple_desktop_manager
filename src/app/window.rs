@@ -222,16 +222,15 @@ fn wire_window_events(
         let stack_editor = content_stack.clone();
         let sidebar_editor = sidebar.clone();
         let selected_editor = selected_entry.clone();
-        let del_fn = show_delete_confirmation.clone();
         let save_fn = handle_save.clone();
         let open_holder_inner = open_editor_holder.clone();
 
         *open_editor_holder.borrow_mut() = Some(Box::new(move |entry: DesktopEntry| {
+            let is_new = entry.source_file.is_none();
             *selected_editor.borrow_mut() = Some(entry.clone());
-            sidebar_editor.borrow().delete_btn.set_sensitive(true);
+            sidebar_editor.borrow().delete_btn.set_sensitive(!is_new);
 
             let on_save = save_fn.clone();
-            let on_delete = del_fn.clone();
             let cancel_entry = entry.clone();
             let open_again = open_holder_inner.clone();
             let stack_cancel = stack_editor.clone();
@@ -242,7 +241,6 @@ fn wire_window_events(
                 &win_editor,
                 entry,
                 move |e| on_save(e),
-                move |e| on_delete(e),
                 move || {
                     if cancel_entry.source_file.is_none() {
                         *sel_cancel.borrow_mut() = None;
@@ -267,6 +265,7 @@ fn wire_window_events(
 
     // Sidebar selection handler
     let sidebar_sel_cb = sidebar.clone();
+    let selected_sel_cb = selected_entry.clone();
     let open_holder_sel = open_editor_holder.clone();
     sidebar.borrow().selection.connect_selected_notify(move |sel| {
         let Some(item) = sel.selected_item() else { return };
@@ -277,8 +276,15 @@ fn wire_window_events(
             .map(|(_, i)| i.parse().unwrap_or(usize::MAX))
             .unwrap_or(usize::MAX);
         if let Some(entry) = sidebar_sel_cb.borrow().get_entry(idx) {
-            if let Some(open_fn) = open_holder_sel.borrow().as_ref() {
-                open_fn(entry);
+            let already_open = selected_sel_cb
+                .borrow()
+                .as_ref()
+                .map(|cur| cur.source_file.is_some() && cur.source_file == entry.source_file)
+                .unwrap_or(false);
+            if !already_open {
+                if let Some(open_fn) = open_holder_sel.borrow().as_ref() {
+                    open_fn(entry);
+                }
             }
         }
     });
@@ -338,6 +344,8 @@ fn setup_live_file_monitoring(
                         stack_mon.remove(&existing);
                     }
                     stack_mon.set_visible_child_name("empty");
+                } else {
+                    sidebar_mon.borrow().select_entry_by_path(src);
                 }
             }
         }

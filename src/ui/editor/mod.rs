@@ -28,7 +28,6 @@ impl Editor {
         parent: &impl IsA<Window>,
         entry: DesktopEntry,
         on_save: impl Fn(DesktopEntry) + 'static,
-        on_delete: impl Fn(DesktopEntry) + 'static,
         on_cancel: impl Fn() + 'static,
     ) -> Self {
         let parent: Window = parent.upcast_ref().clone();
@@ -64,7 +63,7 @@ impl Editor {
 
         // Separator & Footer
         root.append(&build_separator());
-        root.append(&build_editor_footer(&state, on_save, on_delete, on_cancel));
+        root.append(&build_editor_footer(&state, on_save, on_cancel));
 
         Self { root, state }
     }

@@ -50,8 +50,9 @@ impl Sidebar {
         root.append(&search);
 
         // String store
-        let store = StringList::new(&[]);
-        append_entries_to_store(&store, &entries_rc.borrow());
+        let payloads = build_payloads(&entries_rc.borrow());
+        let str_refs: Vec<&str> = payloads.iter().map(|s| s.as_str()).collect();
+        let store = StringList::new(&str_refs);
 
         // Custom search filter using search_service::matches
         let query_cell = Rc::new(RefCell::new(String::new()));
@@ -191,35 +192,40 @@ impl Sidebar {
     /// Replace the entry list and rebuild rows (used after deleting/saving/adding).
     pub fn refresh(&self, new_entries: Vec<DesktopEntry>) {
         *self.entries.borrow_mut() = new_entries;
-        self.store.splice(0, self.store.n_items(), &[]);
-        append_entries_to_store(&self.store, &self.entries.borrow());
+        let old_count = self.store.n_items();
+        let payloads = build_payloads(&self.entries.borrow());
+        let str_refs: Vec<&str> = payloads.iter().map(|s| s.as_str()).collect();
+        self.store.splice(0, old_count, &str_refs);
         self.filter.changed(FilterChange::Different);
         self.selection.set_selected(gtk4::INVALID_LIST_POSITION);
     }
 }
 
-fn append_entries_to_store(store: &StringList, entries: &[DesktopEntry]) {
-    for (i, e) in entries.iter().enumerate() {
-        let display_name = if e.name.trim().is_empty() {
-            e.suggested_filename()
-        } else {
-            e.name.clone()
-        };
-        let subtitle = if !e.comment.is_empty() {
-            &e.comment
-        } else {
-            &e.generic_name
-        };
-        let payload = format!(
-            "{}{}{}{}{}{}{}",
-            display_name,
-            Sidebar::SEP,
-            e.icon,
-            Sidebar::SEP,
-            subtitle,
-            Sidebar::SEP,
-            i
-        );
-        store.append(&payload);
-    }
+fn build_payloads(entries: &[DesktopEntry]) -> Vec<String> {
+    entries
+        .iter()
+        .enumerate()
+        .map(|(i, e)| {
+            let display_name = if e.name.trim().is_empty() {
+                e.suggested_filename()
+            } else {
+                e.name.clone()
+            };
+            let subtitle = if !e.comment.is_empty() {
+                &e.comment
+            } else {
+                &e.generic_name
+            };
+            format!(
+                "{}{}{}{}{}{}{}",
+                display_name,
+                Sidebar::SEP,
+                e.icon,
+                Sidebar::SEP,
+                subtitle,
+                Sidebar::SEP,
+                i
+            )
+        })
+        .collect()
 }

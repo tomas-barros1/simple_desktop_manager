@@ -8,11 +8,10 @@ use gtk4::{Align, Box as GtkBox, Button, Label, Orientation};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// Build the bottom action bar for the editor with Run, Delete, Cancel, and Save buttons.
+/// Build the bottom action bar for the editor with Run, Cancel, and Save buttons.
 pub fn build_editor_footer(
     state: &Rc<RefCell<DesktopEntry>>,
     on_save: impl Fn(DesktopEntry) + 'static,
-    on_delete: impl Fn(DesktopEntry) + 'static,
     on_cancel: impl Fn() + 'static,
 ) -> GtkBox {
     let footer = GtkBox::builder()
@@ -35,12 +34,6 @@ pub fn build_editor_footer(
     let run_btn = Button::builder()
         .icon_name("media-playback-start-symbolic")
         .tooltip_text(&t("run"))
-        .build();
-
-    let delete_btn = Button::builder()
-        .icon_name("user-trash-symbolic")
-        .tooltip_text(&t("delete_entry"))
-        .css_classes(["destructive-action"])
         .build();
 
     let cancel_btn = Button::builder().label(&t("cancel")).build();
@@ -67,13 +60,6 @@ pub fn build_editor_footer(
                 status_run.set_text(&err_msg);
             }
         }
-    });
-
-    // Delete action
-    let state_del = state.clone();
-    let on_delete_rc = Rc::new(on_delete);
-    delete_btn.connect_clicked(move |_| {
-        on_delete_rc(state_del.borrow().clone());
     });
 
     // Cancel action
@@ -103,7 +89,6 @@ pub fn build_editor_footer(
 
     footer.append(&status);
     footer.append(&run_btn);
-    footer.append(&delete_btn);
     footer.append(&cancel_btn);
     footer.append(&save_btn);
 
