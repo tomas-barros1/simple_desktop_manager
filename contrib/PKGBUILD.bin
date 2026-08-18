@@ -1,0 +1,26 @@
+# Maintainer: Tomas Barros <tomasabbarros3@gmail.com>
+
+pkgname=simple-menu-manager-bin
+pkgver=0.1.1
+pkgrel=1
+pkgdesc="Modern, lightweight Linux Desktop Entry (.desktop) editor written in Rust with GTK4 & LibAdwaita (precompiled binary)"
+arch=('x86_64')
+url="https://github.com/tomas-barros1/simple_desktop_manager"
+license=('MIT')
+depends=(
+    'gtk4'
+    'libadwaita'
+    'glibc'
+    'gcc-libs'
+)
+provides=('simple-menu-manager')
+conflicts=('simple-menu-manager')
+source=("$pkgname-v$pkgver.tar.gz::$url/releases/download/v$pkgver/simple-menu-manager-v$pkgver-x86_64-linux.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+    cd "simple-menu-manager-v$pkgver-x86_64-linux"
+    install -Dm755 "simple_menu_manager" "$pkgdir/usr/bin/simple_menu_manager"
+    install -Dm644 "dev.simplemenu.DesktopManager.desktop" "$pkgdir/usr/share/applications/dev.simplemenu.DesktopManager.desktop"
+    install -Dm644 "README.md" "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

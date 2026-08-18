@@ -3,46 +3,65 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  publish-release:
-    name: Build & Release Binary
-    runs-on: ubuntu-latest
+  build-release:
+    name: Build & Publish Release
+    runs-on: ubuntu-24.04
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install System Dependencies
+      - name: Install system dependencies (GTK4 & LibAdwaita)
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev pkg-config
+          sudo apt-get install -y --no-install-recommends \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            pkg-config \
+            build-essential
 
-      - name: Set up Rust Toolchain
+      - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Build Release Binary
-        run: cargo build --release
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
 
-      - name: Prepare Release Package
+      - name: Build Release Binary
+        run: cargo build --release --verbose
+
+      - name: Package Assets & Calculate SHA256
         run: |
-          mkdir -p release-pkg
-          cp target/release/simple_menu_manager release-pkg/
-          cp dev.simplemenu.DesktopManager.desktop release-pkg/
-          cp README.md release-pkg/
-          cp Makefile release-pkg/
-          tar -czvf simple_menu_manager-linux-x86_64.tar.gz -C release-pkg .
+          VERSION="${GITHUB_REF_NAME#v}"
+          ARCHIVE_NAME="simple-menu-manager-v${VERSION}-x86_64-linux"
+          BUNDLE_DIR="dist/${ARCHIVE_NAME}"
+          
+          mkdir -p "${BUNDLE_DIR}"
+          cp target/release/simple_menu_manager "${BUNDLE_DIR}/"
+          cp dev.simplemenu.DesktopManager.desktop "${BUNDLE_DIR}/"
+          cp README.md "${BUNDLE_DIR}/"
+          
+          mkdir -p dist/archives
+          tar -czvf "dist/archives/${ARCHIVE_NAME}.tar.gz" -C dist "${ARCHIVE_NAME}"
+          
+          cd dist/archives
+          sha256sum "${ARCHIVE_NAME}.tar.gz" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: simple_menu_manager-linux-x86_64.tar.gz
+          files: |
+            dist/archives/*.tar.gz
+            dist/archives/SHA256SUMS.txt
+          generate_release_notes: true
           draft: false
           prerelease: false
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
