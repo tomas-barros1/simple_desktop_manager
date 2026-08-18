@@ -14,6 +14,8 @@
   "status_cancelled": "Cancelled",
   "status_deleted": "Entry deleted",
   "status_error": "Error: {error}",
+  "error_dialog_title": "Error",
+  "ok": "OK",
   "status_launched": "App launched",
   "status_opening_url": "Opening URL…",
   "dialog_icon_title": "Choose Icon",

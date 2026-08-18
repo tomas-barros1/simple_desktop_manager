@@ -390,10 +390,10 @@ fn wire_window_events(
 fn show_error_dialog(parent: &ApplicationWindow, message: &str) {
     let err_dialog = MessageDialog::builder()
         .transient_for(parent)
-        .heading("Error")
+        .heading(&t("error_dialog_title"))
         .body(message)
         .build();
-    err_dialog.add_response("ok", "OK");
+    err_dialog.add_response("ok", &t("ok"));
     err_dialog.present();
 }
 

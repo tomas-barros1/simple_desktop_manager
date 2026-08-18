@@ -117,6 +117,7 @@ pub fn t(key: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn test_i18n_translations() {
@@ -128,5 +129,27 @@ mod tests {
         I18n::set_language(Language::PtBr);
         assert_eq!(t("app_title"), "Gerenciador de Desktop");
         assert_eq!(t("new_entry"), "Nova Entrada");
+    }
+
+    #[test]
+    fn test_all_keys_in_sync() {
+        let en: HashMap<String, String> =
+            serde_json::from_str(include_str!("../../i18n/en.json")).unwrap();
+        let pt: HashMap<String, String> =
+            serde_json::from_str(include_str!("../../i18n/pt_BR.json")).unwrap();
+
+        for key in en.keys() {
+            assert!(
+                pt.contains_key(key),
+                "Missing translation in pt_BR.json for key: '{key}'"
+            );
+        }
+
+        for key in pt.keys() {
+            assert!(
+                en.contains_key(key),
+                "Missing translation in en.json for key: '{key}'"
+            );
+        }
     }
 }
