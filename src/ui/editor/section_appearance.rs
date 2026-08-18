@@ -1,8 +1,7 @@
 use crate::models::DesktopEntry;
 use crate::services::i18n::t;
 use crate::ui::components::{
-    build_adw_entry_row, build_adw_path_row, build_preferences_group, parse_semicolon_list,
-    BrowseMode,
+    build_adw_entry_row, build_adw_icon_row, build_preferences_group, parse_semicolon_list,
 };
 use gtk4::Window;
 use libadwaita::prelude::*;
@@ -15,14 +14,12 @@ pub fn build_appearance_section(parent: &Window, state: &Rc<RefCell<DesktopEntry
     let group = build_preferences_group(&t("section_appearance"));
     let entry = state.borrow().clone();
 
-    // Icon
+    // Icon (with live preview prefix and browse dialog suffix)
     let state_icon = state.clone();
-    let icon_row = build_adw_path_row(
+    let icon_row = build_adw_icon_row(
         parent,
         &t("icon"),
         &entry.icon,
-        "image-x-generic-symbolic",
-        BrowseMode::Icon,
         move |val| {
             state_icon.borrow_mut().icon = val;
         },

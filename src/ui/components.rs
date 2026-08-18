@@ -146,6 +146,84 @@ pub fn build_adw_path_row(
     row
 }
 
+/// Create an AdwEntryRow for icons with a live icon preview prefix and browse button suffix.
+pub fn build_adw_icon_row(
+    parent: &Window,
+    title: &str,
+    value: &str,
+    on_change: impl Fn(String) + 'static,
+) -> EntryRow {
+    let row = EntryRow::builder()
+        .title(title)
+        .text(value)
+        .build();
+
+    let icon_cache = crate::services::icon_cache::IconCache::new();
+    let preview = gtk4::Image::builder()
+        .pixel_size(28)
+        .width_request(28)
+        .height_request(28)
+        .valign(Align::Center)
+        .margin_start(4)
+        .build();
+
+    if let Some(paintable) = icon_cache.lookup(value) {
+        preview.set_paintable(Some(&paintable));
+    } else {
+        preview.set_icon_name(Some("application-x-executable"));
+    }
+
+    let browse = Button::builder()
+        .icon_name("image-x-generic-symbolic")
+        .valign(Align::Center)
+        .css_classes(["flat"])
+        .tooltip_text(&t("browse"))
+        .build();
+
+    let row_dlg = row.clone();
+    let parent_dlg = parent.clone();
+    browse.connect_clicked(move |_| {
+        let dialog = FileDialog::builder()
+            .title(&t("dialog_icon_title"))
+            .modal(true)
+            .build();
+        dialog.set_filters(Some(&file_filters(BrowseMode::Icon)));
+
+        let row_pick = row_dlg.clone();
+        let parent_pick = parent_dlg.clone();
+        let on_pick = move |result: Result<gtk4::gio::File, gtk4::glib::Error>| {
+            if let Ok(file) = result {
+                if let Some(path) = file.path() {
+                    row_pick.set_text(&path.to_string_lossy());
+                }
+            }
+        };
+
+        dialog.open(
+            Some(&parent_pick),
+            None::<&gtk4::gio::Cancellable>,
+            on_pick,
+        );
+    });
+
+    let on_change = Rc::new(on_change);
+    let preview_update = preview.clone();
+    let cache_update = icon_cache.clone();
+    row.connect_changed(move |r| {
+        let text = r.text().to_string();
+        if let Some(paintable) = cache_update.lookup(&text) {
+            preview_update.set_paintable(Some(&paintable));
+        } else {
+            preview_update.set_icon_name(Some("application-x-executable"));
+        }
+        on_change(text);
+    });
+
+    row.add_prefix(&preview);
+    row.add_suffix(&browse);
+    row
+}
+
 /// Create a horizontal separator line.
 pub fn build_separator() -> Separator {
     Separator::builder().orientation(Orientation::Horizontal).build()
