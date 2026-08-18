@@ -6,9 +6,12 @@ use crate::ui::editor::Editor;
 use crate::ui::sidebar::Sidebar;
 use gtk4::gio::FileMonitor;
 use gtk4::prelude::*;
-use gtk4::{Align, Box as GtkBox, HeaderBar, Orientation, Paned, Stack};
+use gtk4::{Align, Stack};
 use libadwaita::prelude::*;
-use libadwaita::{ApplicationWindow, MessageDialog, ResponseAppearance, StatusPage, Toast, ToastOverlay};
+use libadwaita::{
+    ApplicationWindow, HeaderBar as AdwHeaderBar, MessageDialog, NavigationPage,
+    NavigationSplitView, ResponseAppearance, StatusPage, Toast, ToastOverlay, ToolbarView,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -41,7 +44,7 @@ const CSS_STYLE: &str = r#"
 }
 "#;
 
-/// Main application window: split-view layout of sidebar + editor with live filesystem sync.
+/// Main application window: responsive split-view layout of sidebar + editor with live filesystem sync.
 pub struct Window {
     pub widget: ApplicationWindow,
     _monitors: Vec<FileMonitor>,
@@ -58,29 +61,43 @@ impl Window {
             .default_height(680)
             .build();
 
-        let header_bar = HeaderBar::new();
         let entries = desktop_service::load_all();
         let sidebar = Rc::new(RefCell::new(Sidebar::new(entries)));
         let content_stack = Stack::builder().build();
         let toast_overlay = ToastOverlay::new();
 
-        let paned = Paned::builder()
-            .wide_handle(true)
-            .start_child(&sidebar.borrow().root)
-            .end_child(&content_stack)
-            .shrink_start_child(false)
-            .shrink_end_child(false)
-            .position(320)
-            .build();
+        let split_view = NavigationSplitView::new();
+        split_view.set_min_sidebar_width(280.0);
+        split_view.set_max_sidebar_width(380.0);
 
-        toast_overlay.set_child(Some(&paned));
+        // Sidebar page with HeaderBar in ToolbarView
+        let sidebar_toolbar = ToolbarView::new();
+        let sidebar_header = AdwHeaderBar::new();
+        sidebar_toolbar.add_top_bar(&sidebar_header);
+        sidebar_toolbar.set_content(Some(&sidebar.borrow().root));
 
-        let main_box = GtkBox::builder()
-            .orientation(Orientation::Vertical)
+        let sidebar_page = NavigationPage::builder()
+            .title(&t("app_title"))
+            .tag("sidebar")
+            .child(&sidebar_toolbar)
             .build();
-        main_box.append(&header_bar);
-        main_box.append(&toast_overlay);
-        win.set_content(Some(&main_box));
+        split_view.set_sidebar(Some(&sidebar_page));
+
+        // Content page with HeaderBar in ToolbarView
+        let content_toolbar = ToolbarView::new();
+        let content_header = AdwHeaderBar::new();
+        content_toolbar.add_top_bar(&content_header);
+        content_toolbar.set_content(Some(&content_stack));
+
+        let content_page = NavigationPage::builder()
+            .title(&t("app_title"))
+            .tag("content")
+            .child(&content_toolbar)
+            .build();
+        split_view.set_content(Some(&content_page));
+
+        toast_overlay.set_child(Some(&split_view));
+        win.set_content(Some(&toast_overlay));
 
         let selected_entry: Rc<RefCell<Option<DesktopEntry>>> = Rc::new(RefCell::new(None));
 
@@ -91,6 +108,8 @@ impl Window {
             &content_stack,
             &selected_entry,
             &toast_overlay,
+            &split_view,
+            &content_page,
         );
 
         // Watch XDG application directories for real-time filesystem synchronization
@@ -150,12 +169,16 @@ fn wire_window_events(
     content_stack: &Stack,
     selected_entry: &Rc<RefCell<Option<DesktopEntry>>>,
     toast_overlay: &ToastOverlay,
+    split_view: &NavigationSplitView,
+    content_page: &NavigationPage,
 ) {
     let win_dialog = win.clone();
     let stack_del = content_stack.clone();
     let sidebar_del = sidebar.clone();
     let selected_del = selected_entry.clone();
     let toast_del = toast_overlay.clone();
+    let split_del = split_view.clone();
+    let page_del = content_page.clone();
 
     // Open/Reload Editor closure
     let open_editor_holder: Rc<RefCell<Option<Box<dyn Fn(DesktopEntry)>>>> =
@@ -182,6 +205,8 @@ fn wire_window_events(
                 stack_del.remove(&existing);
             }
             stack_del.set_visible_child_name("empty");
+            page_del.set_title(&t("app_title"));
+            split_del.set_show_content(false);
             return;
         }
 
@@ -207,6 +232,8 @@ fn wire_window_events(
         let sidebar_resp = sidebar_del.clone();
         let selected_resp = selected_del.clone();
         let toast_resp = toast_del.clone();
+        let split_resp = split_del.clone();
+        let page_resp = page_del.clone();
         let entry_to_delete = entry.clone();
 
         dialog.connect_response(None, move |_, response| {
@@ -221,6 +248,8 @@ fn wire_window_events(
                             stack_resp.remove(&existing);
                         }
                         stack_resp.set_visible_child_name("empty");
+                        page_resp.set_title(&t("app_title"));
+                        split_resp.set_show_content(false);
                         toast_resp.add_toast(Toast::new(&t("status_deleted")));
                     }
                     Err(err) => {
@@ -235,9 +264,13 @@ fn wire_window_events(
     // Save handler
     let sidebar_save = sidebar.clone();
     let selected_save = selected_entry.clone();
+    let page_save = content_page.clone();
     let handle_save = move |saved_entry: DesktopEntry| {
         *selected_save.borrow_mut() = Some(saved_entry.clone());
         sidebar_save.borrow().delete_btn.set_sensitive(true);
+        if !saved_entry.name.trim().is_empty() {
+            page_save.set_title(&saved_entry.name);
+        }
         let fresh = desktop_service::load_all();
         sidebar_save.borrow().refresh(fresh);
         if let Some(src) = &saved_entry.source_file {
@@ -251,6 +284,8 @@ fn wire_window_events(
         let sidebar_editor = sidebar.clone();
         let selected_editor = selected_entry.clone();
         let toast_editor = toast_overlay.clone();
+        let split_editor = split_view.clone();
+        let page_editor = content_page.clone();
         let save_fn = handle_save.clone();
         let open_holder_inner = open_editor_holder.clone();
 
@@ -259,12 +294,21 @@ fn wire_window_events(
             *selected_editor.borrow_mut() = Some(entry.clone());
             sidebar_editor.borrow().delete_btn.set_sensitive(!is_new);
 
+            let title = if entry.name.trim().is_empty() {
+                t("new_entry")
+            } else {
+                entry.name.clone()
+            };
+            page_editor.set_title(&title);
+
             let on_save = save_fn.clone();
             let cancel_entry = entry.clone();
             let open_again = open_holder_inner.clone();
             let stack_cancel = stack_editor.clone();
             let sel_cancel = selected_editor.clone();
             let side_cancel = sidebar_editor.clone();
+            let split_cancel = split_editor.clone();
+            let page_cancel = page_editor.clone();
 
             let editor = Editor::new(
                 &win_editor,
@@ -279,6 +323,8 @@ fn wire_window_events(
                             stack_cancel.remove(&existing);
                         }
                         stack_cancel.set_visible_child_name("empty");
+                        page_cancel.set_title(&t("app_title"));
+                        split_cancel.set_show_content(false);
                     } else if let Some(open_fn) = open_again.borrow().as_ref() {
                         open_fn(cancel_entry.clone());
                     }
@@ -290,6 +336,7 @@ fn wire_window_events(
             }
             stack_editor.add_named(&editor.root, Some("editor"));
             stack_editor.set_visible_child_name("editor");
+            split_editor.set_show_content(true);
         }));
     }
 
