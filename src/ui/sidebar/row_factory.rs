@@ -1,3 +1,4 @@
+use crate::services::i18n::t;
 use crate::services::icon_cache::IconCache;
 use gtk4::pango::EllipsizeMode;
 use gtk4::prelude::*;
@@ -31,11 +32,27 @@ pub fn install_row_factory(factory: &SignalListItemFactory) {
             .hexpand(true)
             .build();
 
+        let header_box = GtkBox::builder()
+            .orientation(Orientation::Horizontal)
+            .spacing(6)
+            .hexpand(true)
+            .build();
+
         let name = Label::builder()
             .ellipsize(EllipsizeMode::End)
             .halign(Align::Start)
+            .hexpand(true)
             .css_classes(["sidebar-row-title"])
             .build();
+
+        let badge = Label::builder()
+            .halign(Align::End)
+            .valign(Align::Center)
+            .css_classes(["caption", "dim-label"])
+            .build();
+
+        header_box.append(&name);
+        header_box.append(&badge);
 
         let subtitle = Label::builder()
             .ellipsize(EllipsizeMode::End)
@@ -43,7 +60,7 @@ pub fn install_row_factory(factory: &SignalListItemFactory) {
             .css_classes(["sidebar-row-subtitle", "dim-label"])
             .build();
 
-        text_box.append(&name);
+        text_box.append(&header_box);
         text_box.append(&subtitle);
 
         row.append(&icon);
@@ -71,6 +88,7 @@ pub fn install_row_factory(factory: &SignalListItemFactory) {
         let name_part = parts.next().unwrap_or("");
         let icon_spec = parts.next().unwrap_or("");
         let subtitle_part = parts.next().unwrap_or("");
+        let origin_part = parts.next().unwrap_or("");
 
         let Some(row_widget) = list_item.child() else {
             return;
@@ -90,13 +108,25 @@ pub fn install_row_factory(factory: &SignalListItemFactory) {
         let Some(text_box) = next_child.downcast::<GtkBox>().ok() else {
             return;
         };
-        let Some(name_widget) = text_box.first_child() else {
+        let Some(header_widget) = text_box.first_child() else {
+            return;
+        };
+        let Some(header_box) = header_widget.clone().downcast::<GtkBox>().ok() else {
+            return;
+        };
+        let Some(name_widget) = header_box.first_child() else {
             return;
         };
         let Some(name_label) = name_widget.clone().downcast::<Label>().ok() else {
             return;
         };
-        let Some(subtitle_widget) = name_widget.next_sibling() else {
+        let Some(badge_widget) = name_widget.next_sibling() else {
+            return;
+        };
+        let Some(badge_label) = badge_widget.downcast::<Label>().ok() else {
+            return;
+        };
+        let Some(subtitle_widget) = header_widget.next_sibling() else {
             return;
         };
         let Some(subtitle_label) = subtitle_widget.downcast::<Label>().ok() else {
@@ -106,6 +136,14 @@ pub fn install_row_factory(factory: &SignalListItemFactory) {
         name_label.set_text(name_part);
         subtitle_label.set_text(subtitle_part);
         subtitle_label.set_visible(!subtitle_part.is_empty());
+
+        if origin_part == "sys" {
+            badge_label.set_text(&t("badge_system"));
+            badge_label.set_css_classes(&["badge-system"]);
+        } else {
+            badge_label.set_text(&t("badge_user"));
+            badge_label.set_css_classes(&["badge-user"]);
+        }
 
         if let Some(paintable) = icon_cache.lookup(icon_spec) {
             image.set_paintable(Some(&paintable));

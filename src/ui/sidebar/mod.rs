@@ -216,13 +216,16 @@ fn build_payloads(entries: &[DesktopEntry]) -> Vec<String> {
             } else {
                 &e.generic_name
             };
+            let origin = if e.is_system_entry() { "sys" } else { "usr" };
             format!(
-                "{}{}{}{}{}{}{}",
+                "{}{}{}{}{}{}{}{}{}",
                 display_name,
                 Sidebar::SEP,
                 e.icon,
                 Sidebar::SEP,
                 subtitle,
+                Sidebar::SEP,
+                origin,
                 Sidebar::SEP,
                 i
             )

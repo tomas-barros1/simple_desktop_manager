@@ -21,6 +21,24 @@ const CSS_STYLE: &str = r#"
 .sidebar-row-subtitle {
     font-size: 11px;
 }
+
+.badge-system {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background-color: alpha(@warning_color, 0.18);
+    color: @warning_color;
+}
+
+.badge-user {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background-color: alpha(@accent_color, 0.15);
+    color: @accent_color;
+}
 "#;
 
 /// Main application window: split-view layout of sidebar + editor with live filesystem sync.

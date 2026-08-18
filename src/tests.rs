@@ -275,6 +275,20 @@ fn save_entry_with_refcell_state_does_not_panic() {
 }
 
 #[test]
+fn is_system_entry_detection() {
+    let mut sys_entry = DesktopEntry::default();
+    sys_entry.source_file = Some(std::path::PathBuf::from("/usr/share/applications/firefox.desktop"));
+    assert!(sys_entry.is_system_entry());
+
+    let mut user_entry = DesktopEntry::default();
+    user_entry.source_file = Some(std::path::PathBuf::from("/home/user/.local/share/applications/custom.desktop"));
+    assert!(!user_entry.is_system_entry());
+
+    let new_entry = DesktopEntry::default();
+    assert!(!new_entry.is_system_entry());
+}
+
+#[test]
 fn search_paths_deduplication() {
     let paths = desktop_service::search_paths();
     let mut seen = std::collections::HashSet::new();

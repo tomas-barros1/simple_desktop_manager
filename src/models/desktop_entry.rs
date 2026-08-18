@@ -101,6 +101,20 @@ impl DesktopEntry {
         }
         format!("{file}.desktop")
     }
+
+    /// Returns true if this entry resides in a system directory (e.g. /usr/share/applications)
+    /// that requires elevated privileges (sudo/pkexec) to modify directly.
+    pub fn is_system_entry(&self) -> bool {
+        if let Some(path) = &self.source_file {
+            let path_str = path.to_string_lossy();
+            path_str.starts_with("/usr/")
+                || path_str.starts_with("/var/")
+                || path_str.starts_with("/etc/")
+                || path_str.starts_with("/opt/")
+        } else {
+            false
+        }
+    }
 }
 
 /// Parse a .desktop file into a `DesktopEntry`. Falls back to empty strings on

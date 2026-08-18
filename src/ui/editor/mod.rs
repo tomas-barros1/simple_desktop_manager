@@ -5,11 +5,12 @@ mod section_exec;
 mod section_general;
 
 use crate::models::DesktopEntry;
+use crate::services::i18n::t;
 use crate::ui::components::build_separator;
 use gtk4::prelude::*;
 use gtk4::{Box as GtkBox, Orientation, Window};
 use libadwaita::prelude::*;
-use libadwaita::{PreferencesPage, ToastOverlay};
+use libadwaita::{Banner, PreferencesPage, Toast, ToastOverlay};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -40,6 +41,25 @@ impl Editor {
             .orientation(Orientation::Vertical)
             .spacing(0)
             .build();
+
+        // System entry warning banner with "Create Local Copy" action
+        let is_sys = state.borrow().is_system_entry();
+        let banner = Banner::builder()
+            .title(&t("banner_system_entry"))
+            .button_label(&t("banner_create_local_copy"))
+            .revealed(is_sys)
+            .build();
+
+        let state_banner = state.clone();
+        let banner_handle = banner.clone();
+        let toast_banner = toast_overlay.clone();
+        banner.connect_button_clicked(move |_| {
+            state_banner.borrow_mut().source_file = None;
+            banner_handle.set_revealed(false);
+            toast_banner.add_toast(Toast::new(&t("toast_local_copy_created")));
+        });
+
+        root.append(&banner);
 
         let page = PreferencesPage::new();
 
