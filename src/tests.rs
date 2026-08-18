@@ -249,6 +249,32 @@ fn save_and_delete_entry_lifecycle() {
 }
 
 #[test]
+fn save_entry_with_refcell_state_does_not_panic() {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    let dir = temp_dir("refcell_save");
+    fs::create_dir_all(&dir).unwrap();
+    let file_path = dir.join("refcell-app.desktop");
+
+    let mut entry = DesktopEntry::default();
+    entry.name = "RefCell Save Test".to_string();
+    entry.exec = "test-exec".to_string();
+    entry.source_file = Some(file_path.clone());
+
+    let state = Rc::new(RefCell::new(entry));
+
+    let entry_to_save = state.borrow().clone();
+    let target_path = desktop_service::save_entry(&entry_to_save).unwrap();
+    state.borrow_mut().source_file = Some(target_path.clone());
+    state.borrow_mut().directory = target_path.parent().map(|p| p.to_path_buf());
+
+    assert_eq!(state.borrow().source_file, Some(file_path));
+
+    fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
 fn search_paths_deduplication() {
     let paths = desktop_service::search_paths();
     let mut seen = std::collections::HashSet::new();

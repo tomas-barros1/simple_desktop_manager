@@ -73,12 +73,14 @@ pub fn build_editor_footer(
     let status_save = status.clone();
     let on_save_rc = Rc::new(on_save);
     save_btn.connect_clicked(move |_| {
-        match desktop_service::save_entry(&state_save.borrow()) {
+        let entry_to_save = state_save.borrow().clone();
+        match desktop_service::save_entry(&entry_to_save) {
             Ok(target_path) => {
                 state_save.borrow_mut().source_file = Some(target_path.clone());
                 state_save.borrow_mut().directory = target_path.parent().map(|p| p.to_path_buf());
                 status_save.set_text(&t("status_saved"));
-                on_save_rc(state_save.borrow().clone());
+                let saved = state_save.borrow().clone();
+                on_save_rc(saved);
             }
             Err(err) => {
                 let err_msg = t("status_error").replace("{error}", &err.to_string());
