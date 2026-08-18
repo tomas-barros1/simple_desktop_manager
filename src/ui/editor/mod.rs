@@ -7,7 +7,9 @@ mod section_general;
 use crate::models::DesktopEntry;
 use crate::ui::components::build_separator;
 use gtk4::prelude::*;
-use gtk4::{Box as GtkBox, Orientation, ScrolledWindow, Window};
+use gtk4::{Box as GtkBox, Orientation, Window};
+use libadwaita::prelude::*;
+use libadwaita::{PreferencesPage, ToastOverlay};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -17,7 +19,7 @@ use section_appearance::build_appearance_section;
 use section_exec::build_exec_section;
 use section_general::build_general_section;
 
-/// Editor panel: cleanly divided into styled sections and a bottom action bar.
+/// Editor panel: cleanly divided into LibAdwaita preferences groups and an action footer.
 pub struct Editor {
     pub root: GtkBox,
     pub state: Rc<RefCell<DesktopEntry>>,
@@ -27,6 +29,7 @@ impl Editor {
     pub fn new(
         parent: &impl IsA<Window>,
         entry: DesktopEntry,
+        toast_overlay: &ToastOverlay,
         on_save: impl Fn(DesktopEntry) + 'static,
         on_cancel: impl Fn() + 'static,
     ) -> Self {
@@ -38,32 +41,19 @@ impl Editor {
             .spacing(0)
             .build();
 
-        let viewport = ScrolledWindow::builder()
-            .hexpand(true)
-            .vexpand(true)
-            .build();
+        let page = PreferencesPage::new();
 
-        let form = GtkBox::builder()
-            .orientation(Orientation::Vertical)
-            .spacing(6)
-            .margin_start(24)
-            .margin_end(24)
-            .margin_top(18)
-            .margin_bottom(18)
-            .build();
+        // Assemble modular Adwaita preferences groups
+        page.add(&build_general_section(&state));
+        page.add(&build_exec_section(&parent, &state));
+        page.add(&build_appearance_section(&parent, &state));
+        page.add(&build_advanced_section(&state));
 
-        // Assemble modular sections
-        form.append(&build_general_section(&state));
-        form.append(&build_exec_section(&parent, &state));
-        form.append(&build_appearance_section(&parent, &state));
-        form.append(&build_advanced_section(&state));
-
-        viewport.set_child(Some(&form));
-        root.append(&viewport);
+        root.append(&page);
 
         // Separator & Footer
         root.append(&build_separator());
-        root.append(&build_editor_footer(&state, on_save, on_cancel));
+        root.append(&build_editor_footer(&state, toast_overlay, on_save, on_cancel));
 
         Self { root, state }
     }

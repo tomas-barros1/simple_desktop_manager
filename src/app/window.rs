@@ -8,7 +8,7 @@ use gtk4::gio::FileMonitor;
 use gtk4::prelude::*;
 use gtk4::{Align, Box as GtkBox, HeaderBar, Orientation, Paned, Stack};
 use libadwaita::prelude::*;
-use libadwaita::{ApplicationWindow, MessageDialog, ResponseAppearance};
+use libadwaita::{ApplicationWindow, MessageDialog, ResponseAppearance, StatusPage, Toast, ToastOverlay};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -20,16 +20,6 @@ const CSS_STYLE: &str = r#"
 
 .sidebar-row-subtitle {
     font-size: 11px;
-}
-
-.section-header {
-    font-size: 15px;
-    font-weight: bold;
-}
-
-.field-label {
-    font-size: 13px;
-    font-weight: 500;
 }
 "#;
 
@@ -53,7 +43,8 @@ impl Window {
         let header_bar = HeaderBar::new();
         let entries = desktop_service::load_all();
         let sidebar = Rc::new(RefCell::new(Sidebar::new(entries)));
-        let content_stack = build_content_stack();
+        let content_stack = Stack::builder().build();
+        let toast_overlay = ToastOverlay::new();
 
         let paned = Paned::builder()
             .wide_handle(true)
@@ -64,11 +55,13 @@ impl Window {
             .position(320)
             .build();
 
+        toast_overlay.set_child(Some(&paned));
+
         let main_box = GtkBox::builder()
             .orientation(Orientation::Vertical)
             .build();
         main_box.append(&header_bar);
-        main_box.append(&paned);
+        main_box.append(&toast_overlay);
         win.set_content(Some(&main_box));
 
         let selected_entry: Rc<RefCell<Option<DesktopEntry>>> = Rc::new(RefCell::new(None));
@@ -79,6 +72,7 @@ impl Window {
             &sidebar,
             &content_stack,
             &selected_entry,
+            &toast_overlay,
         );
 
         // Watch XDG application directories for real-time filesystem synchronization
@@ -111,25 +105,25 @@ fn init_css_provider() {
     }
 }
 
-fn build_content_stack() -> Stack {
-    let placeholder = GtkBox::builder()
-        .orientation(Orientation::Vertical)
-        .hexpand(true)
-        .vexpand(true)
-        .margin_top(48)
-        .build();
-
-    let hint = gtk4::Label::builder()
-        .label(&t("select_entry_hint"))
-        .css_classes(["dim-label", "title"])
+fn build_empty_status_page(on_new_entry: impl Fn() + 'static) -> StatusPage {
+    let new_btn = gtk4::Button::builder()
+        .label(&t("new_entry"))
+        .icon_name("list-add-symbolic")
+        .css_classes(["suggested-action", "pill"])
         .halign(Align::Center)
         .build();
-    placeholder.append(&hint);
 
-    let stack = Stack::builder().build();
-    stack.add_named(&placeholder, Some("empty"));
-    stack.set_visible_child_name("empty");
-    stack
+    let on_new_rc = Rc::new(on_new_entry);
+    new_btn.connect_clicked(move |_| {
+        on_new_rc();
+    });
+
+    StatusPage::builder()
+        .icon_name("application-x-executable-symbolic")
+        .title(&t("empty_state_title"))
+        .description(&t("empty_state_desc"))
+        .child(&new_btn)
+        .build()
 }
 
 fn wire_window_events(
@@ -137,11 +131,29 @@ fn wire_window_events(
     sidebar: &Rc<RefCell<Sidebar>>,
     content_stack: &Stack,
     selected_entry: &Rc<RefCell<Option<DesktopEntry>>>,
+    toast_overlay: &ToastOverlay,
 ) {
     let win_dialog = win.clone();
     let stack_del = content_stack.clone();
     let sidebar_del = sidebar.clone();
     let selected_del = selected_entry.clone();
+    let toast_del = toast_overlay.clone();
+
+    // Open/Reload Editor closure
+    let open_editor_holder: Rc<RefCell<Option<Box<dyn Fn(DesktopEntry)>>>> =
+        Rc::new(RefCell::new(None));
+
+    // Build empty status page
+    let sidebar_empty = sidebar.clone();
+    let open_empty = open_editor_holder.clone();
+    let empty_page = build_empty_status_page(move || {
+        sidebar_empty.borrow().clear_selection();
+        if let Some(open_fn) = open_empty.borrow().as_ref() {
+            open_fn(DesktopEntry::default());
+        }
+    });
+    content_stack.add_named(&empty_page, Some("empty"));
+    content_stack.set_visible_child_name("empty");
 
     // Delete handler
     let show_delete_confirmation = move |entry: DesktopEntry| {
@@ -176,6 +188,7 @@ fn wire_window_events(
         let stack_resp = stack_del.clone();
         let sidebar_resp = sidebar_del.clone();
         let selected_resp = selected_del.clone();
+        let toast_resp = toast_del.clone();
         let entry_to_delete = entry.clone();
 
         dialog.connect_response(None, move |_, response| {
@@ -190,6 +203,7 @@ fn wire_window_events(
                             stack_resp.remove(&existing);
                         }
                         stack_resp.set_visible_child_name("empty");
+                        toast_resp.add_toast(Toast::new(&t("status_deleted")));
                     }
                     Err(err) => {
                         show_error_dialog(&win_err, &err.to_string());
@@ -213,15 +227,12 @@ fn wire_window_events(
         }
     };
 
-    // Open/Reload Editor closure
-    let open_editor_holder: Rc<RefCell<Option<Box<dyn Fn(DesktopEntry)>>>> =
-        Rc::new(RefCell::new(None));
-
     {
         let win_editor = win.clone();
         let stack_editor = content_stack.clone();
         let sidebar_editor = sidebar.clone();
         let selected_editor = selected_entry.clone();
+        let toast_editor = toast_overlay.clone();
         let save_fn = handle_save.clone();
         let open_holder_inner = open_editor_holder.clone();
 
@@ -240,6 +251,7 @@ fn wire_window_events(
             let editor = Editor::new(
                 &win_editor,
                 entry,
+                &toast_editor,
                 move |e| on_save(e),
                 move || {
                     if cancel_entry.source_file.is_none() {

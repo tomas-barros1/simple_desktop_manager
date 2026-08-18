@@ -1,9 +1,11 @@
 use crate::services::i18n::t;
 use gtk4::prelude::*;
 use gtk4::{
-    Align, Box as GtkBox, Button, CheckButton, DropDown, Entry as GtkEntry, FileDialog, FileFilter,
-    Label, Orientation, Separator, StringList, Widget, Window,
+    Align, Button, FileDialog, FileFilter, Orientation, Separator, StringList, Window,
 };
+use libadwaita::prelude::*;
+use libadwaita::{ComboRow, EntryRow, PreferencesGroup, SwitchRow};
+use std::rc::Rc;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BrowseMode {
@@ -12,98 +14,97 @@ pub enum BrowseMode {
     Icon,
 }
 
-/// Create a styled section header label.
-pub fn build_section_header(title: &str) -> Label {
-    Label::builder()
-        .label(title)
-        .halign(Align::Start)
-        .margin_top(16)
+/// Create a styled Adwaita preferences group.
+pub fn build_preferences_group(title: &str) -> PreferencesGroup {
+    PreferencesGroup::builder()
+        .title(title)
+        .margin_top(6)
         .margin_bottom(6)
-        .css_classes(["section-header", "accent"])
         .build()
 }
 
-/// Create a text entry field with initial content.
-pub fn build_entry(text: &str) -> GtkEntry {
-    GtkEntry::builder().text(text).hexpand(true).build()
-}
-
-/// Create a dropdown selector with given items and pre-selected item.
-pub fn build_dropdown(items: &[&str], current: &str) -> DropDown {
-    let list = StringList::new(items);
-    let dd = DropDown::builder().model(&list).build();
-    if let Some(pos) = items.iter().position(|i| *i == current) {
-        dd.set_selected(pos as u32);
-    }
-    dd
-}
-
-/// Create a checkbox button with initial state and toggle callback.
-pub fn build_check(active: bool, on_toggle: impl Fn(bool) + 'static) -> CheckButton {
-    let cb = CheckButton::builder()
-        .active(active)
-        .halign(Align::Start)
-        .valign(Align::Center)
+/// Create an AdwEntryRow with title, initial value, and change callback.
+pub fn build_adw_entry_row(
+    title: &str,
+    text: &str,
+    on_change: impl Fn(String) + 'static,
+) -> EntryRow {
+    let row = EntryRow::builder()
+        .title(title)
+        .text(text)
         .build();
-    cb.connect_toggled(move |b| {
-        on_toggle(b.is_active());
+    let on_change = Rc::new(on_change);
+    row.connect_changed(move |r| {
+        on_change(r.text().to_string());
     });
-    cb
-}
-
-/// Create a horizontal separator line.
-pub fn build_separator() -> Separator {
-    Separator::builder().orientation(Orientation::Horizontal).build()
-}
-
-/// Create a form row with a right-aligned label and an input widget.
-pub fn build_labelled_row(text: &str, input: &impl IsA<Widget>) -> GtkBox {
-    let row = GtkBox::builder()
-        .orientation(Orientation::Horizontal)
-        .spacing(16)
-        .margin_top(4)
-        .margin_bottom(4)
-        .build();
-    let label = Label::builder()
-        .label(text)
-        .width_request(160)
-        .halign(Align::End)
-        .valign(Align::Center)
-        .xalign(1.0)
-        .css_classes(["field-label", "dim-label"])
-        .build();
-    if input.is::<CheckButton>() {
-        input.set_halign(Align::Start);
-    } else {
-        input.set_hexpand(true);
-        input.set_halign(Align::Fill);
-    }
-    row.append(&label);
-    row.append(input);
     row
 }
 
-/// Create a text entry field with a browse button that opens a native file/folder/icon dialog.
-pub fn build_path_row(
+/// Create an AdwComboRow selector with given items and pre-selected item.
+pub fn build_adw_combo_row(
+    title: &str,
+    items: &[&str],
+    current: &str,
+    on_select: impl Fn(String) + 'static,
+) -> ComboRow {
+    let list = StringList::new(items);
+    let row = ComboRow::builder()
+        .title(title)
+        .model(&list)
+        .build();
+    if let Some(pos) = items.iter().position(|i| *i == current) {
+        row.set_selected(pos as u32);
+    }
+    let on_select = Rc::new(on_select);
+    row.connect_selected_notify(move |r| {
+        if let Some(item) = r.selected_item() {
+            if let Ok(obj) = item.downcast::<gtk4::StringObject>() {
+                on_select(obj.string().to_string());
+            }
+        }
+    });
+    row
+}
+
+/// Create an AdwSwitchRow button with initial state and toggle callback.
+pub fn build_adw_switch_row(
+    title: &str,
+    active: bool,
+    on_toggle: impl Fn(bool) + 'static,
+) -> SwitchRow {
+    let row = SwitchRow::builder()
+        .title(title)
+        .active(active)
+        .build();
+    let on_toggle = Rc::new(on_toggle);
+    row.connect_active_notify(move |r| {
+        on_toggle(r.is_active());
+    });
+    row
+}
+
+/// Create an AdwEntryRow with a browse button suffix that opens a native file/folder/icon dialog.
+pub fn build_adw_path_row(
     parent: &Window,
+    title: &str,
     value: &str,
     icon_name: &str,
     mode: BrowseMode,
-    on_change: impl Fn(&GtkEntry) + 'static,
-) -> GtkBox {
-    let row = GtkBox::builder()
-        .orientation(Orientation::Horizontal)
-        .spacing(6)
+    on_change: impl Fn(String) + 'static,
+) -> EntryRow {
+    let row = EntryRow::builder()
+        .title(title)
+        .text(value)
         .build();
-    let entry = build_entry(value);
-    entry.connect_changed(move |e| on_change(e));
 
     let browse = Button::builder()
         .icon_name(icon_name)
+        .valign(Align::Center)
+        .css_classes(["flat"])
         .tooltip_text(&t("browse"))
         .build();
 
-    let entry_dlg = entry.clone();
+    let row_dlg = row.clone();
     let parent_dlg = parent.clone();
     browse.connect_clicked(move |_| {
         let dialog = FileDialog::builder()
@@ -112,12 +113,12 @@ pub fn build_path_row(
             .build();
         dialog.set_filters(Some(&file_filters(mode)));
 
-        let entry_pick = entry_dlg.clone();
+        let row_pick = row_dlg.clone();
         let parent_pick = parent_dlg.clone();
         let on_pick = move |result: Result<gtk4::gio::File, gtk4::glib::Error>| {
             if let Ok(file) = result {
                 if let Some(path) = file.path() {
-                    entry_pick.set_text(&path.to_string_lossy());
+                    row_pick.set_text(&path.to_string_lossy());
                 }
             }
         };
@@ -136,9 +137,18 @@ pub fn build_path_row(
         }
     });
 
-    row.append(&entry);
-    row.append(&browse);
+    let on_change = Rc::new(on_change);
+    row.connect_changed(move |r| {
+        on_change(r.text().to_string());
+    });
+
+    row.add_suffix(&browse);
     row
+}
+
+/// Create a horizontal separator line.
+pub fn build_separator() -> Separator {
+    Separator::builder().orientation(Orientation::Horizontal).build()
 }
 
 fn dialog_title(mode: BrowseMode) -> String {
