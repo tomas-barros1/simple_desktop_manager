@@ -3,15 +3,18 @@ BINDIR ?= $(PREFIX)/bin
 APPDIR ?= $(PREFIX)/share/applications
 NAME = simple_menu_manager
 DESKTOP_FILE = dev.simplemenu.DesktopManager.desktop
+TARGET_BIN = target/release/$(NAME)
 
 .PHONY: all build release check test clean install uninstall
 
-all: build
+all: release
 
 build:
 	cargo build
 
-release:
+release: $(TARGET_BIN)
+
+$(TARGET_BIN):
 	cargo build --release
 
 check:
@@ -23,12 +26,16 @@ test:
 clean:
 	cargo clean
 
-install: release
-	sudo install -d $(DESTDIR)$(BINDIR)
-	sudo install -m 755 target/release/$(NAME) $(DESTDIR)$(BINDIR)/$(NAME)
-	sudo install -d $(DESTDIR)$(APPDIR)
-	sudo install -m 644 $(DESKTOP_FILE) $(DESTDIR)$(APPDIR)/$(DESKTOP_FILE)
+install:
+	@if [ ! -f $(TARGET_BIN) ]; then \
+		echo "Binary not found, building release..."; \
+		cargo build --release; \
+	fi
+	install -d $(DESTDIR)$(BINDIR)
+	install -m 755 $(TARGET_BIN) $(DESTDIR)$(BINDIR)/$(NAME)
+	install -d $(DESTDIR)$(APPDIR)
+	install -m 644 $(DESKTOP_FILE) $(DESTDIR)$(APPDIR)/$(DESKTOP_FILE)
 
 uninstall:
-	sudo rm -f $(DESTDIR)$(BINDIR)/$(NAME)
-	sudo rm -f $(DESTDIR)$(APPDIR)/$(DESKTOP_FILE)
+	rm -f $(DESTDIR)$(BINDIR)/$(NAME)
+	rm -f $(DESTDIR)$(APPDIR)/$(DESKTOP_FILE)
