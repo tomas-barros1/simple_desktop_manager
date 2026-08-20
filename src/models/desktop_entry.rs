@@ -117,6 +117,35 @@ impl DesktopEntry {
     }
 }
 
+/// Returns the list of locale suffix tags to check in priority order based on system locale.
+/// E.g. for "pt_BR.UTF-8", returns vec!["pt_BR", "pt"].
+pub fn get_locale_candidates() -> Vec<String> {
+    for var in ["LC_ALL", "LC_MESSAGES", "LANG"] {
+        if let Ok(val) = std::env::var(var) {
+            let val = val.trim();
+            if val.is_empty() || val.eq_ignore_ascii_case("c") || val.eq_ignore_ascii_case("posix") {
+                continue;
+            }
+            let without_encoding = val.split('.').next().unwrap_or(val);
+            let locale = without_encoding.split('@').next().unwrap_or(without_encoding);
+
+            let mut candidates = Vec::new();
+            if !locale.is_empty() {
+                candidates.push(locale.to_string());
+                if let Some((lang, _country)) = locale.split_once('_') {
+                    if !lang.is_empty() && lang != locale {
+                        candidates.push(lang.to_string());
+                    }
+                }
+            }
+            if !candidates.is_empty() {
+                return candidates;
+            }
+        }
+    }
+    Vec::new()
+}
+
 /// Parse a .desktop file into a `DesktopEntry`. Falls back to empty strings on
 /// missing keys. The directory and source_file metadata are set by the caller.
 pub fn parse_desktop_file(content: &str, path: &Path) -> Result<DesktopEntry, std::io::Error> {
@@ -144,26 +173,38 @@ pub fn parse_desktop_file(content: &str, path: &Path) -> Result<DesktopEntry, st
         all_keys.insert(key.clone(), value.clone());
     }
 
-    let get = |k: &str| -> String { all_keys.get(k).cloned().unwrap_or_default() };
+    let locale_candidates = get_locale_candidates();
 
-    entry.entry_type = get("Type");
+    let get_localized = |base_key: &str| -> String {
+        for loc in &locale_candidates {
+            let loc_key = format!("{base_key}[{loc}]");
+            if let Some(val) = all_keys.get(&loc_key) {
+                if !val.trim().is_empty() {
+                    return val.clone();
+                }
+            }
+        }
+        all_keys.get(base_key).cloned().unwrap_or_default()
+    };
+
+    entry.entry_type = all_keys.get("Type").cloned().unwrap_or_default();
     if entry.entry_type.is_empty() {
         entry.entry_type = "Application".to_string();
     }
-    entry.name = get("Name");
-    entry.generic_name = get("GenericName");
-    entry.comment = get("Comment");
-    entry.icon = get("Icon");
-    entry.exec = get("Exec");
-    entry.path = get("Path");
-    entry.terminal = parse_bool(&get("Terminal"));
-    entry.no_display = parse_bool(&get("NoDisplay"));
-    entry.startup_notify = parse_bool(&get("StartupNotify"));
-    entry.startup_wm_class = get("StartupWMClass");
-    entry.categories = parse_list(&get("Categories"));
-    entry.keywords = parse_list(&get("Keywords"));
-    entry.mime_types = parse_list(&get("MimeType"));
-    entry.url = get("URL");
+    entry.name = get_localized("Name");
+    entry.generic_name = get_localized("GenericName");
+    entry.comment = get_localized("Comment");
+    entry.icon = all_keys.get("Icon").cloned().unwrap_or_default();
+    entry.exec = all_keys.get("Exec").cloned().unwrap_or_default();
+    entry.path = all_keys.get("Path").cloned().unwrap_or_default();
+    entry.terminal = parse_bool(all_keys.get("Terminal").unwrap_or(&String::new()));
+    entry.no_display = parse_bool(all_keys.get("NoDisplay").unwrap_or(&String::new()));
+    entry.startup_notify = parse_bool(all_keys.get("StartupNotify").unwrap_or(&String::new()));
+    entry.startup_wm_class = all_keys.get("StartupWMClass").cloned().unwrap_or_default();
+    entry.categories = parse_list(all_keys.get("Categories").unwrap_or(&String::new()));
+    entry.keywords = parse_list(&get_localized("Keywords"));
+    entry.mime_types = parse_list(all_keys.get("MimeType").unwrap_or(&String::new()));
+    entry.url = all_keys.get("URL").cloned().unwrap_or_default();
 
     entry.source_file = Some(path.to_path_buf());
     entry.directory = path.parent().map(|p| p.to_path_buf());

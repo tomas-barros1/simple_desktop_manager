@@ -86,6 +86,29 @@ fn parse_skips_comments_other_sections_and_crlf() {
 }
 
 #[test]
+fn parse_localized_desktop_entry() {
+    let content = "\
+[Desktop Entry]
+Type=Application
+Name=Files
+Name[pt_BR]=Arquivos
+Name[es]=Archivos
+GenericName=File Manager
+GenericName[pt_BR]=Gerenciador de arquivos
+Comment=Access and organize files
+Comment[pt_BR]=Acesse e organize arquivos
+Exec=nautilus %U
+";
+    unsafe {
+        std::env::set_var("LANG", "pt_BR.UTF-8");
+    }
+    let entry = parse_desktop_file(content, Path::new("/usr/share/applications/org.gnome.Nautilus.desktop")).unwrap();
+    assert_eq!(entry.name, "Arquivos");
+    assert_eq!(entry.generic_name, "Gerenciador de arquivos");
+    assert_eq!(entry.comment, "Acesse e organize arquivos");
+}
+
+#[test]
 fn serialize_round_trip_preserves_fields() {
     let entry = sample_entry(Path::new("/tmp/firefox.desktop"));
     let reparsed = parse_desktop_file(
