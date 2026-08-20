@@ -1,7 +1,7 @@
 # Maintainer: Tomas Barros <tomasabbarros3@gmail.com>
 
 pkgname=simple-menu-manager-bin
-pkgver=0.1.1
+pkgver=0.2.0
 pkgrel=1
 pkgdesc="Modern, lightweight Linux Desktop Entry (.desktop) editor written in Rust with GTK4 & LibAdwaita (precompiled binary)"
 arch=('x86_64')

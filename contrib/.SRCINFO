@@ -1,6 +1,6 @@
 pkgbase = simple-menu-manager
 	pkgdesc = Modern, lightweight Linux Desktop Entry (.desktop) editor written in Rust with GTK4 & LibAdwaita
-	pkgver = 0.1.1
+	pkgver = 0.2.0
 	pkgrel = 1
 	url = https://github.com/tomas-barros1/simple_desktop_manager
 	arch = x86_64
@@ -13,7 +13,7 @@ pkgbase = simple-menu-manager
 	depends = libadwaita
 	depends = glibc
 	depends = gcc-libs
-	source = simple-menu-manager-0.1.1.tar.gz::https://github.com/tomas-barros1/simple_desktop_manager/archive/refs/tags/v0.1.1.tar.gz
+	source = simple-menu-manager-0.2.0.tar.gz::https://github.com/tomas-barros1/simple_desktop_manager/archive/refs/tags/v0.2.0.tar.gz
 	sha256sums = SKIP
 
 pkgname = simple-menu-manager
