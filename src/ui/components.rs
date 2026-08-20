@@ -118,7 +118,12 @@ pub fn build_adw_path_row(
         let on_pick = move |result: Result<gtk4::gio::File, gtk4::glib::Error>| {
             if let Ok(file) = result {
                 if let Some(path) = file.path() {
-                    row_pick.set_text(&path.to_string_lossy());
+                    let path_str = path.to_string_lossy();
+                    if mode == BrowseMode::File && path_str.contains(' ') && !path_str.starts_with('"') {
+                        row_pick.set_text(&format!("\"{path_str}\""));
+                    } else {
+                        row_pick.set_text(&path_str);
+                    }
                 }
             }
         };
