@@ -173,8 +173,10 @@ pub fn build_adw_icon_row(
         .build();
 
     if let Some(paintable) = icon_cache.lookup(value) {
+        preview.set_icon_name(None);
         preview.set_paintable(Some(&paintable));
     } else {
+        preview.set_paintable(None::<&gtk4::gdk::Paintable>);
         preview.set_icon_name(Some("application-x-executable"));
     }
 
@@ -217,8 +219,10 @@ pub fn build_adw_icon_row(
     row.connect_changed(move |r| {
         let text = r.text().to_string();
         if let Some(paintable) = cache_update.lookup(&text) {
+            preview_update.set_icon_name(None);
             preview_update.set_paintable(Some(&paintable));
         } else {
+            preview_update.set_paintable(None::<&gtk4::gdk::Paintable>);
             preview_update.set_icon_name(Some("application-x-executable"));
         }
         on_change(text);

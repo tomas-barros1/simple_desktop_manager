@@ -146,8 +146,10 @@ pub fn install_row_factory(factory: &SignalListItemFactory) {
         }
 
         if let Some(paintable) = icon_cache.lookup(icon_spec) {
+            image.set_icon_name(None);
             image.set_paintable(Some(&paintable));
         } else {
+            image.set_paintable(None::<&gtk4::gdk::Paintable>);
             image.set_icon_name(Some("application-x-executable"));
         }
     });

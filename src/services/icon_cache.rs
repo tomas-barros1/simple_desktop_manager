@@ -14,9 +14,55 @@ pub struct IconCache {
 
 impl IconCache {
     pub fn new() -> Self {
-        Self {
-            theme: IconTheme::default(),
+        let theme = if let Some(display) = gtk4::gdk::Display::default() {
+            gtk4::IconTheme::for_display(&display)
+        } else {
+            gtk4::IconTheme::new()
+        };
+
+        // Add standard user icon directories
+        if let Ok(home) = std::env::var("HOME") {
+            let user_icons = PathBuf::from(home.clone()).join(".local/share/icons");
+            if user_icons.is_dir() {
+                theme.add_search_path(user_icons);
+            }
+            let dot_icons = PathBuf::from(home).join(".icons");
+            if dot_icons.is_dir() {
+                theme.add_search_path(dot_icons);
+            }
         }
+
+        // Ensure system XDG icon directories are registered
+        if let Ok(xdg_data_dirs) = std::env::var("XDG_DATA_DIRS") {
+            for dir in xdg_data_dirs.split(':') {
+                if !dir.trim().is_empty() {
+                    let p = PathBuf::from(dir).join("icons");
+                    if p.is_dir() {
+                        theme.add_search_path(p);
+                    }
+                }
+            }
+        } else {
+            let usr_share = PathBuf::from("/usr/share/icons");
+            if usr_share.is_dir() {
+                theme.add_search_path(usr_share);
+            }
+            let usr_local = PathBuf::from("/usr/local/share/icons");
+            if usr_local.is_dir() {
+                theme.add_search_path(usr_local);
+            }
+        }
+
+        // Apply explicit user theme from GtkSettings if configured
+        if let Some(settings) = gtk4::Settings::default() {
+            if let Some(theme_name) = settings.gtk_icon_theme_name() {
+                if !theme_name.is_empty() {
+                    theme.set_theme_name(Some(&theme_name));
+                }
+            }
+        }
+
+        Self { theme }
     }
 
     #[allow(dead_code)]
@@ -59,7 +105,7 @@ impl IconCache {
                 size,
                 1,
                 TextDirection::None,
-                IconLookupFlags::FORCE_REGULAR,
+                IconLookupFlags::empty(),
             );
             return Some(paintable.upcast::<Paintable>());
         }
@@ -71,7 +117,7 @@ impl IconCache {
                 size,
                 1,
                 TextDirection::None,
-                IconLookupFlags::FORCE_REGULAR,
+                IconLookupFlags::empty(),
             );
             return Some(paintable.upcast::<Paintable>());
         }
