@@ -57,6 +57,15 @@ pub fn launch_entry(entry: &DesktopEntry) -> Result<LaunchOutcome, std::io::Erro
     let path_dir = entry.path.trim();
     if !path_dir.is_empty() {
         command.current_dir(path_dir);
+    } else {
+        // Fallback: if path is not specified, attempt to use the binary's parent directory
+        let raw_bin = cmd_str.trim_matches('"').trim_matches('\'');
+        let candidate = std::path::Path::new(raw_bin);
+        if let Some(parent) = candidate.parent() {
+            if parent.is_dir() && parent != std::path::Path::new("") && parent != std::path::Path::new("/") {
+                command.current_dir(parent);
+            }
+        }
     }
 
     command.spawn()?;

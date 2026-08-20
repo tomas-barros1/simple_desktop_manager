@@ -15,20 +15,6 @@ pub fn build_exec_section(parent: &Window, state: &Rc<RefCell<DesktopEntry>>) ->
     let group = build_preferences_group(&t("section_execution"));
     let entry = state.borrow().clone();
 
-    // Exec
-    let state_exec = state.clone();
-    let exec_row = build_adw_path_row(
-        parent,
-        &t("exec"),
-        &entry.exec,
-        "document-open-symbolic",
-        BrowseMode::File,
-        move |val| {
-            state_exec.borrow_mut().exec = val;
-        },
-    );
-    group.add(&exec_row);
-
     // Path
     let state_path = state.clone();
     let path_row = build_adw_path_row(
@@ -41,6 +27,32 @@ pub fn build_exec_section(parent: &Window, state: &Rc<RefCell<DesktopEntry>>) ->
             state_path.borrow_mut().path = val;
         },
     );
+
+    // Exec
+    let state_exec = state.clone();
+    let path_row_clone = path_row.clone();
+    let exec_row = build_adw_path_row(
+        parent,
+        &t("exec"),
+        &entry.exec,
+        "document-open-symbolic",
+        BrowseMode::File,
+        move |val| {
+            state_exec.borrow_mut().exec = val.clone();
+            // Auto-populate Path with binary's directory if Path is currently empty
+            if state_exec.borrow().path.trim().is_empty() {
+                let clean_val = val.trim_matches('"').trim_matches('\'');
+                if let Some(parent) = std::path::Path::new(clean_val).parent() {
+                    let parent_str = parent.to_string_lossy().to_string();
+                    if !parent_str.is_empty() {
+                        state_exec.borrow_mut().path = parent_str.clone();
+                        path_row_clone.set_text(&parent_str);
+                    }
+                }
+            }
+        },
+    );
+    group.add(&exec_row);
     group.add(&path_row);
 
     // Terminal
