@@ -142,18 +142,31 @@ fn build_categories_expander(state: &Rc<RefCell<DesktopEntry>>) -> ExpanderRow {
         expander.add_row(&row);
     }
 
-    // Custom categories entry row
+    // Option "Other" with its own Checkbox and EntryRow
+    let other_active = !custom_cats.is_empty();
+    let other_check = CheckButton::builder()
+        .active(other_active)
+        .valign(Align::Center)
+        .build();
+
+    let other_row = ActionRow::builder()
+        .title(&t("category_other"))
+        .subtitle(&t("category_other_subtitle"))
+        .activatable_widget(&other_check)
+        .build();
+    other_row.add_suffix(&other_check);
+
     let state_custom = state.clone();
     let expander_custom = expander.clone();
-    let custom_holder = custom_cats_cell;
+    let custom_holder = custom_cats_cell.clone();
+
     let custom_row = build_adw_entry_row(
-        &t("category_other"),
+        &t("category_other_entry"),
         &custom_cats.join(";"),
         move |val| {
             let new_custom = parse_semicolon_list(&val);
             *custom_holder.borrow_mut() = new_custom.clone();
 
-            // Rebuild categories = (all active standard categories) + (new custom)
             let current = state_custom.borrow().categories.clone();
             let mut updated: Vec<String> = Vec::new();
 
@@ -172,7 +185,39 @@ fn build_categories_expander(state: &Rc<RefCell<DesktopEntry>>) -> ExpanderRow {
             expander_custom.set_subtitle(&format_categories_summary(&updated));
         },
     );
+    custom_row.set_visible(other_active);
 
+    let custom_row_toggle = custom_row.clone();
+    let state_toggle = state.clone();
+    let expander_toggle = expander.clone();
+    let custom_holder_toggle = custom_cats_cell;
+
+    other_check.connect_toggled(move |btn| {
+        let is_active = btn.is_active();
+        custom_row_toggle.set_visible(is_active);
+
+        let current = state_toggle.borrow().categories.clone();
+        let mut updated: Vec<String> = Vec::new();
+
+        for &(std_cat, _) in STANDARD_CATEGORIES {
+            if current.iter().any(|c| c.eq_ignore_ascii_case(std_cat)) {
+                updated.push(std_cat.to_string());
+            }
+        }
+
+        if is_active {
+            for c in custom_holder_toggle.borrow().iter() {
+                if !updated.iter().any(|u| u.eq_ignore_ascii_case(c)) {
+                    updated.push(c.clone());
+                }
+            }
+        }
+
+        state_toggle.borrow_mut().categories = updated.clone();
+        expander_toggle.set_subtitle(&format_categories_summary(&updated));
+    });
+
+    expander.add_row(&other_row);
     expander.add_row(&custom_row);
     expander
 }

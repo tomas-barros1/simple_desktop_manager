@@ -64,7 +64,9 @@
   "category_settings": "Settings",
   "category_system": "System",
   "category_utility": "Utilities",
-  "category_other": "Other / Custom Categories",
+  "category_other": "Other",
+  "category_other_entry": "Custom Categories (separated by ';')",
+  "category_other_subtitle": "Add custom categories not listed above",
   "keywords": "Keywords",
   "mime_types": "MIME Types"
 }

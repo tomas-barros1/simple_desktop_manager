@@ -64,7 +64,9 @@
   "category_settings": "Configurações",
   "category_system": "Sistema",
   "category_utility": "Utilitários",
-  "category_other": "Outras / Categorias Personalizadas",
+  "category_other": "Outro",
+  "category_other_entry": "Categorias Personalizadas (separadas por ';')",
+  "category_other_subtitle": "Adicionar categorias personalizadas não listadas acima",
   "keywords": "Palavras-chave",
   "mime_types": "Tipos Mime"
 }
